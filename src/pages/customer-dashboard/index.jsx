@@ -1,177 +1,68 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useSelector } from 'react-redux';
 import Header from '../../components/ui/Header';
 import NotificationCenter from '../../components/ui/NotificationCenter';
 import UserContextIndicator from '../../components/ui/UserContextIndicator';
-import ServiceCategoryCard from './components/ServiceCategoryCard';
 import RecentBookingCard from './components/RecentBookingCard';
-import RecommendationCard from './components/RecommendationCard';
-import QuickStatsCard from './components/QuickStatsCard';
-import SearchBar from './components/SearchBar';
 import Icon from '../../components/AppIcon';
 import Button from '../../components/ui/Button';
+import { getBookings } from '../../utils/api';
 
 const CustomerDashboard = () => {
   const navigate = useNavigate();
   const [isNotificationOpen, setIsNotificationOpen] = useState(false);
-  const [searchResults, setSearchResults] = useState([]);
-  const [isSearching, setIsSearching] = useState(false);
+  const user = useSelector((s) => s.auth.user);
+  const [bookings, setBookingsState] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [techList, setTechList] = useState([]);
 
-  // Mock user data
-  const currentUser = {
-    name: "Sarah Johnson",
-    email: "sarah.johnson@email.com",
-    role: "customer"
-  };
-
-  // Mock service categories data
-  const serviceCategories = [
-    {
-      id: "plumber",
-      name: "Plumbing Services",
-      type: "plumber",
-      description: "Professional plumbing repairs, installations, and maintenance for your home water systems.",
-      availableTechnicians: 24,
-      rating: 4.8
-    },
-    {
-      id: "carpenter",
-      name: "Carpentry Services", 
-      type: "carpenter",
-      description: "Expert woodworking, furniture repair, and custom carpentry solutions for your home.",
-      availableTechnicians: 18,
-      rating: 4.7
-    },
-    {
-      id: "electrician",
-      name: "Electrical Services",
-      type: "electrician", 
-      description: "Licensed electrical work including wiring, repairs, and safety inspections.",
-      availableTechnicians: 31,
-      rating: 4.9
+  useEffect(() => {
+    if (!user?.id) {
+      setBookingsState([]);
+      return;
     }
-  ];
-
-  // Mock recent bookings data
-  const recentBookings = [
-    {
-      id: "BK001",
-      serviceName: "Kitchen Sink Repair",
-      serviceType: "plumber",
-      status: "confirmed",
-      scheduledDate: "2025-01-07T14:00:00Z",
-      technician: {
-        name: "Mike Rodriguez",
-        rating: 4.9
-      },
-      rated: false
-    },
-    {
-      id: "BK002", 
-      serviceName: "Cabinet Installation",
-      serviceType: "carpenter",
-      status: "in-progress",
-      scheduledDate: "2025-01-06T10:00:00Z",
-      technician: {
-        name: "David Chen",
-        rating: 4.8
-      },
-      rated: false
-    },
-    {
-      id: "BK003",
-      serviceName: "Outlet Installation",
-      serviceType: "electrician",
-      status: "completed",
-      scheduledDate: "2025-01-04T16:00:00Z",
-      technician: {
-        name: "Lisa Thompson",
-        rating: 5.0
-      },
-      rated: false
-    }
-  ];
-
-  // Mock recommendations data
-  const recommendations = [
-    {
-      id: "REC001",
-      type: "seasonal",
-      title: "Winter Heating Check",
-      description: "Schedule your annual heating system maintenance before the cold season peaks.",
-      category: "HVAC",
-      serviceType: "electrician",
-      discount: 15
-    },
-    {
-      id: "REC002",
-      type: "maintenance", 
-      title: "Gutter Cleaning",
-      description: "Prevent water damage with professional gutter cleaning and inspection services.",
-      category: "Maintenance",
-      serviceType: "carpenter",
-      discount: null
-    },
-    {
-      id: "REC003",
-      type: "popular",
-      title: "Bathroom Faucet Upgrade",
-      description: "Most popular service this month - upgrade your bathroom fixtures with modern designs.",
-      category: "Plumbing",
-      serviceType: "plumber",
-      discount: 20
-    }
-  ];
-
-  // Mock quick stats data
-  const quickStats = [
-    {
-      type: "total-bookings",
-      label: "Total Bookings",
-      value: "12",
-      change: { type: "increase", value: "+2 this month" }
-    },
-    {
-      type: "completed",
-      label: "Completed",
-      value: "9",
-      change: { type: "increase", value: "+3 this week" }
-    },
-    {
-      type: "pending",
-      label: "Pending",
-      value: "2",
-      change: null
-    },
-    {
-      type: "savings",
-      label: "Total Savings",
-      value: "$340",
-      change: { type: "increase", value: "+$45 this month" }
-    }
-  ];
-
-  const handleSearch = (query) => {
-    setIsSearching(true);
-    // Simulate search delay
-    setTimeout(() => {
-      if (query?.trim()) {
-        // Mock search results
-        const mockResults = [
-          { id: 1, name: "Emergency Plumber", type: "plumber", rating: 4.9 },
-          { id: 2, name: "Kitchen Cabinet Repair", type: "carpenter", rating: 4.7 },
-          { id: 3, name: "Electrical Inspection", type: "electrician", rating: 4.8 }
-        ]?.filter(item => 
-          item?.name?.toLowerCase()?.includes(query?.toLowerCase()) ||
-          item?.type?.toLowerCase()?.includes(query?.toLowerCase())
-        );
-        setSearchResults(mockResults);
-      } else {
-        setSearchResults([]);
+    const fetchData = async () => {
+      setLoading(true);
+      setError('');
+      try {
+        const data = await getBookings({ customerId: user.id });
+        setBookingsState(data || []);
+      } catch (e) {
+        setError('Failed to load bookings.');
+      } finally {
+        setLoading(false);
       }
-      setIsSearching(false);
-    }, 500);
-  };
+    };
+    fetchData();
+  }, [user?.id]);
+
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        const { getTechnicians } = await import('../../utils/api');
+        const data = await getTechnicians({ status: 'verified' });
+        if (mounted) setTechList(data || []);
+      } catch {
+        setTechList([]);
+      }
+    })();
+    return () => { mounted = false; };
+  }, []);
+
+  // Transform API bookings to UI-friendly shape for RecentBookingCard
+  const uiBookings = bookings.map(b => ({
+    id: b.id,
+    serviceName: b.serviceName,
+    serviceType: (b.serviceName || '').toLowerCase(),
+    status: b.status === 'accepted' ? 'confirmed' : b.status === 'rejected' ? 'cancelled' : b.status,
+    scheduledDate: b.date,
+    technician: { name: b.technicianName || 'Unassigned', rating: b.rating || undefined },
+    rated: !!b.rating,
+    totalCost: typeof b.totalCost !== 'undefined' ? (b.totalCost.toFixed ? b.totalCost.toFixed(2) : String(b.totalCost)) : undefined,
+  }));
 
   const handleLogout = () => {
     navigate('/user-login');
@@ -194,7 +85,7 @@ const CustomerDashboard = () => {
       {/* Header */}
       <Header 
         userRole="customer" 
-        isAuthenticated={true} 
+        isAuthenticated={!!user} 
         onLogout={handleLogout}
       />
       {/* Main Content */}
@@ -203,7 +94,7 @@ const CustomerDashboard = () => {
         <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between mb-8">
           <div>
             <h1 className="text-2xl lg:text-3xl font-semibold text-foreground mb-2">
-              Welcome back, {currentUser?.name?.split(' ')?.[0]}!
+              {user ? `Welcome back, ${user?.name?.split(' ')?.[0]}!` : 'Welcome to ServiceConnect'}
             </h1>
             <p className="text-muted-foreground">
               Find and book trusted home service professionals in your area.
@@ -216,83 +107,88 @@ const CustomerDashboard = () => {
               isOpen={isNotificationOpen}
               onToggle={handleNotificationToggle}
             />
-            <UserContextIndicator
-              user={currentUser}
-              onLogout={handleLogout}
-              onProfileClick={handleProfileClick}
-              onSettingsClick={handleSettingsClick}
-            />
+            {user && (
+              <UserContextIndicator
+                user={{ name: user.name, email: user.email, role: 'customer' }}
+                onLogout={handleLogout}
+                onProfileClick={handleProfileClick}
+                onSettingsClick={handleSettingsClick}
+              />
+            )}
           </div>
         </div>
 
-        {/* Search Bar */}
-        <div className="mb-8">
-          <SearchBar 
-            onSearch={handleSearch} 
-            onFilterToggle={() => {}} 
-          />
-        </div>
-
-        {/* Quick Stats */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-          {quickStats?.map((stat, index) => (
-            <QuickStatsCard key={index} stat={stat} />
-          ))}
-        </div>
-
+        {/* Content */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Main Content Area */}
           <div className="lg:col-span-2 space-y-8">
-            {/* Service Categories */}
-            <section>
-              <div className="flex items-center justify-between mb-6">
-                <h2 className="text-xl font-semibold text-foreground">
-                  Service Categories
-                </h2>
-                <Button 
-                  variant="ghost" 
-                  size="sm"
-                  iconName="ArrowRight"
-                  iconSize={16}
-                >
-                  View All
-                </Button>
+            {/* Message / Recent Bookings */}
+            {!user && (
+              <div className="rounded-md border bg-white p-6 text-slate-700">
+                No reports available. Please log in and book a slot.
+                <div className="mt-4">
+                  <Button variant="default" onClick={() => navigate('/user-login')} iconName="LogIn" iconPosition="left">Login</Button>
+                </div>
               </div>
-              
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2 gap-4">
-                {serviceCategories?.map((service) => (
-                  <ServiceCategoryCard key={service?.id} service={service} />
-                ))}
-              </div>
-            </section>
+            )}
 
-            {/* Recent Bookings */}
-            <section>
-              <div className="flex items-center justify-between mb-6">
-                <h2 className="text-xl font-semibold text-foreground">
-                  Recent Bookings
-                </h2>
-                <Button 
-                  variant="ghost" 
-                  size="sm"
-                  onClick={() => navigate('/customer-booking-history')}
-                  iconName="History"
-                  iconSize={16}
-                >
-                  View History
-                </Button>
-              </div>
-              
-              <div className="space-y-4">
-                {recentBookings?.map((booking) => (
-                  <RecentBookingCard key={booking?.id} booking={booking} />
-                ))}
-              </div>
-            </section>
+            {user && (
+              <section>
+                <div className="flex items-center justify-between mb-6">
+                  <h2 className="text-xl font-semibold text-foreground">
+                    Recent Bookings
+                  </h2>
+                  <Button 
+                    variant="ghost" 
+                    size="sm"
+                    onClick={() => navigate('/customer-booking-history')}
+                    iconName="History"
+                    iconSize={16}
+                  >
+                    View History
+                  </Button>
+                </div>
+                {loading && <p className="text-sm text-muted-foreground">Loading...</p>}
+                {error && <p className="text-sm text-error">{error}</p>}
+                {!loading && uiBookings.length === 0 && (
+                  <div className="rounded-md border bg-white p-4 text-slate-600">
+                    No reports available. Please log in and book a slot.
+                  </div>
+                )}
+                {!loading && uiBookings.length > 0 && (
+                  <div className="space-y-4">
+                    {uiBookings.map((booking) => (
+                      <RecentBookingCard key={booking.id} booking={booking} />
+                    ))}
+                  </div>
+                )}
+              </section>
+            )}
           </div>
 
           {/* Sidebar */}
           <div className="space-y-8">
+            {/* Available Technicians */}
+            {user && (
+              <section>
+                <h3 className="text-lg font-semibold text-foreground mb-4">Available Technicians</h3>
+                <div className="space-y-2">
+                  {techList.length === 0 && (
+                    <div className="rounded-md border bg-white p-3 text-sm text-slate-600">No technicians available yet.</div>
+                  )}
+                  {techList.map(t => (
+                    <div key={t.id} className="flex items-center justify-between rounded-md border bg-white p-3 text-sm">
+                      <div>
+                        <div className="font-medium text-foreground">{t.name}</div>
+                        <div className="text-xs text-muted-foreground">{t.service}</div>
+                      </div>
+                      <div className="text-xs text-muted-foreground">⭐ {t.rating?.toFixed ? t.rating.toFixed(1) : t.rating}</div>
+                    </div>
+                  ))}
+                </div>
+              </section>
+            )}
+
             {/* Quick Actions */}
             <section>
               <h3 className="text-lg font-semibold text-foreground mb-4">
@@ -333,18 +229,6 @@ const CustomerDashboard = () => {
                 >
                   Account Settings
                 </Button>
-              </div>
-            </section>
-
-            {/* Recommendations */}
-            <section>
-              <h3 className="text-lg font-semibold text-foreground mb-4">
-                Recommended for You
-              </h3>
-              <div className="space-y-4">
-                {recommendations?.map((recommendation) => (
-                  <RecommendationCard key={recommendation?.id} recommendation={recommendation} />
-                ))}
               </div>
             </section>
 

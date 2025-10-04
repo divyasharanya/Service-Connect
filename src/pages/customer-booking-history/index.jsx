@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { useSelector } from 'react-redux';
 import Icon from '../../components/AppIcon';
 import Button from '../../components/ui/Button';
 import Header from '../../components/ui/Header';
@@ -8,139 +9,96 @@ import BookingTable from './components/BookingTable';
 import BookingFilters from './components/BookingFilters';
 import BookingDetailsModal from './components/BookingDetailsModal';
 import RatingModal from './components/RatingModal';
+import RescheduleModal from './components/RescheduleModal';
+import { getBookings, updateBookingStatus, updateBooking } from '../../utils/api';
+import { useDispatch } from 'react-redux';
+import { showError, showSuccess } from '../../features/notifications/notificationsSlice';
 
 const CustomerBookingHistory = () => {
   const navigate = useNavigate();
+  const user = useSelector((s) => s.auth.user);
+  const notify = useDispatch();
   const [viewMode, setViewMode] = useState('table'); // 'table' or 'cards'
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [selectedBooking, setSelectedBooking] = useState(null);
   const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
   const [isRatingModalOpen, setIsRatingModalOpen] = useState(false);
   const [bookingToRate, setBookingToRate] = useState(null);
+  const [rescheduleOpen, setRescheduleOpen] = useState(false);
+  const [rescheduleBooking, setRescheduleBooking] = useState(null);
 
-  // Mock booking data
-  const [allBookings] = useState([
-    {
-      id: "BK001",
-      serviceType: "Plumbing",
-      technicianName: "Michael Rodriguez",
-      technicianPhone: "+1 (555) 123-4567",
-      date: "2025-01-05",
-      time: "14:00",
-      address: "123 Oak Street, Springfield, IL 62701",
-      description: "Kitchen sink repair - fixing leaky faucet and replacing worn gaskets. Customer reported constant dripping and low water pressure.",
-      status: "completed",
-      totalCost: "125.00",
-      serviceFee: "112.50",
-      platformFee: "12.50",
-      duration: "2 hours",
-      rating: 4.8,
-      customerRating: 5,
-      customerReview: "Excellent service! Michael was professional and fixed the issue quickly.",
-      completionNotes: "Replaced faucet gaskets and cleaned aerator. Tested for leaks - all working properly.",
-      rated: true
-    },
-    {
-      id: "BK002",
-      serviceType: "Electrical",
-      technicianName: "Sarah Johnson",
-      technicianPhone: "+1 (555) 234-5678",
-      date: "2025-01-03",
-      time: "10:30",
-      address: "456 Pine Avenue, Springfield, IL 62702",
-      description: "Ceiling fan installation in master bedroom. Customer provided the fan unit.",
-      status: "completed",
-      totalCost: "95.00",
-      serviceFee: "85.50",
-      platformFee: "9.50",
-      duration: "1.5 hours",
-      rating: 4.9,
-      customerRating: null,
-      customerReview: null,
-      completionNotes: "Successfully installed ceiling fan with wall switch. Tested all speeds and lighting.",
-      rated: false
-    },
-    {
-      id: "BK003",
-      serviceType: "HVAC",
-      technicianName: "David Chen",
-      technicianPhone: "+1 (555) 345-6789",
-      date: "2025-01-08",
-      time: "09:00",
-      address: "789 Maple Drive, Springfield, IL 62703",
-      description: "Annual HVAC maintenance and filter replacement. System inspection and cleaning.",
-      status: "confirmed",
-      totalCost: "150.00",
-      serviceFee: "135.00",
-      platformFee: "15.00",
-      duration: "2.5 hours",
-      rating: 4.7,
-      customerRating: null,
-      customerReview: null,
-      completionNotes: null,
-      rated: false
-    },
-    {
-      id: "BK004",
-      serviceType: "Carpentry",
-      technicianName: "James Wilson",
-      technicianPhone: "+1 (555) 456-7890",
-      date: "2025-01-10",
-      time: "13:00",
-      address: "321 Elm Street, Springfield, IL 62704",
-      description: "Custom bookshelf installation in home office. Mounting to wall studs required.",
-      status: "in-progress",
-      totalCost: "200.00",
-      serviceFee: "180.00",
-      platformFee: "20.00",
-      duration: "3 hours",
-      rating: 4.6,
-      customerRating: null,
-      customerReview: null,
-      completionNotes: null,
-      rated: false
-    },
-    {
-      id: "BK005",
-      serviceType: "Painting",
-      technicianName: "Lisa Thompson",
-      technicianPhone: "+1 (555) 567-8901",
-      date: "2024-12-28",
-      time: "08:00",
-      address: "654 Cedar Lane, Springfield, IL 62705",
-      description: "Living room accent wall painting. Customer provided paint and materials.",
-      status: "completed",
-      totalCost: "180.00",
-      serviceFee: "162.00",
-      platformFee: "18.00",
-      duration: "4 hours",
-      rating: 4.5,
-      customerRating: 4,
-      customerReview: "Good work, but took longer than expected. Final result looks great.",
-      completionNotes: "Applied primer and two coats of paint. Protected furniture and cleaned up thoroughly.",
-      rated: true
-    },
-    {
-      id: "BK006",
-      serviceType: "Plumbing",
-      technicianName: "Robert Martinez",
-      technicianPhone: "+1 (555) 678-9012",
-      date: "2024-12-20",
-      time: "15:30",
-      address: "987 Birch Road, Springfield, IL 62706",
-      description: "Toilet replacement in guest bathroom. Old toilet was cracked at the base.",
-      status: "cancelled",
-      totalCost: "220.00",
-      serviceFee: "198.00",
-      platformFee: "22.00",
-      duration: "2 hours",
-      rating: 4.3,
-      customerRating: null,
-      customerReview: null,
-      completionNotes: null,
-      rated: false
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  // Real booking data fetched for logged-in customer
+  const [allBookings, setAllBookings] = useState([]);
+
+  const loadBookings = async () => {
+    if (!user?.id) { setAllBookings([]); return; }
+    setLoading(true);
+    setError('');
+    try {
+      const data = await getBookings({ customerId: user.id });
+      const mapped = (data || []).map(b => ({
+        id: b.id,
+        serviceType: (b.serviceName || '').toLowerCase(),
+        technicianName: b.technicianName || 'Unassigned',
+        technicianPhone: '',
+        date: new Date(b.date).toISOString().slice(0,10),
+        time: new Date(b.date).toISOString().slice(11,16),
+        address: b.location || '',
+        description: b.review || '',
+        status: b.status === 'accepted' ? 'confirmed' : b.status,
+        totalCost: (typeof b.totalCost !== 'undefined') ? (b.totalCost.toFixed ? b.totalCost.toFixed(2) : String(b.totalCost)) : '0.00',
+        serviceFee: (typeof b.serviceFee !== 'undefined') ? (b.serviceFee.toFixed ? b.serviceFee.toFixed(2) : String(b.serviceFee)) : '0.00',
+        platformFee: (typeof b.platformFee !== 'undefined') ? (b.platformFee.toFixed ? b.platformFee.toFixed(2) : String(b.platformFee)) : '0.00',
+        duration: '',
+        rating: b.rating || null,
+        customerRating: b.rating || null,
+        customerReview: b.review || null,
+        completionNotes: '',
+        rated: !!b.rating,
+      }));
+      setAllBookings(mapped);
+    } catch (e) {
+      setError('Failed to load bookings.');
+      setAllBookings([]);
+    } finally {
+      setLoading(false);
     }
-  ]);
+  };
+
+  useEffect(() => {
+    loadBookings();
+  }, [user?.id]);
+
+  const handleCancel = async (booking) => {
+    try {
+      await updateBookingStatus(booking.id, 'cancelled');
+      notify(showSuccess('Booking cancelled'));
+      loadBookings();
+    } catch (e) {
+      notify(showError('Failed to cancel booking'));
+    }
+  };
+
+  const handleReschedule = (booking) => {
+    setRescheduleBooking(booking);
+    setRescheduleOpen(true);
+  };
+
+  const submitReschedule = async (iso) => {
+    try {
+      await updateBooking(rescheduleBooking.id, { date: iso });
+      notify(showSuccess('Booking rescheduled'));
+      setRescheduleOpen(false);
+      setRescheduleBooking(null);
+      loadBookings();
+    } catch (e) {
+      const msg = e?.response?.data?.message || 'Failed to reschedule booking';
+      notify(showError(msg));
+    }
+  };
 
   // Filter state
   const [filters, setFilters] = useState({
@@ -154,7 +112,7 @@ const CustomerBookingHistory = () => {
   });
 
   // Filtered and sorted bookings
-  const [filteredBookings, setFilteredBookings] = useState(allBookings);
+  const [filteredBookings, setFilteredBookings] = useState([]);
 
   // Apply filters and sorting
   useEffect(() => {
@@ -307,7 +265,7 @@ const CustomerBookingHistory = () => {
     <div className="min-h-screen bg-background">
       <Header 
         userRole="customer" 
-        isAuthenticated={true}
+        isAuthenticated={!!user}
         onLogout={() => navigate('/user-login')}
       />
       <main className="container mx-auto px-4 py-8">
@@ -378,8 +336,9 @@ const CustomerBookingHistory = () => {
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center space-x-2">
             <span className="text-sm text-muted-foreground">
-              Showing {filteredBookings?.length} of {allBookings?.length} bookings
+              {loading ? 'Loading bookings...' : `Showing ${filteredBookings?.length} of ${allBookings?.length} bookings`}
             </span>
+            {error && <span className="text-sm text-error ml-3">{error}</span>}
           </div>
           
           <div className="flex items-center space-x-2">
@@ -437,6 +396,8 @@ const CustomerBookingHistory = () => {
                   onRebook={handleRebook}
                   onRate={handleRate}
                   onContact={handleContact}
+                  onCancel={handleCancel}
+                  onReschedule={handleReschedule}
                 />
               </div>
             )}
@@ -452,6 +413,8 @@ const CustomerBookingHistory = () => {
                     onRebook={handleRebook}
                     onRate={handleRate}
                     onContact={handleContact}
+                    onCancel={handleCancel}
+                    onReschedule={handleReschedule}
                   />
                 ))}
               </div>
@@ -488,6 +451,12 @@ const CustomerBookingHistory = () => {
           setBookingToRate(null);
         }}
         onSubmitRating={handleSubmitRating}
+      />
+      <RescheduleModal
+        booking={rescheduleBooking}
+        isOpen={rescheduleOpen}
+        onClose={() => { setRescheduleOpen(false); setRescheduleBooking(null); }}
+        onSubmit={submitReschedule}
       />
     </div>
   );

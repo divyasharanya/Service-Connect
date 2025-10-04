@@ -2,7 +2,7 @@ import React from 'react';
 import Icon from '../../../components/AppIcon';
 import Button from '../../../components/ui/Button';
 
-const BookingCard = ({ booking, onViewDetails, onRebook, onRate, onContact }) => {
+const BookingCard = ({ booking, onViewDetails, onRebook, onRate, onContact, onCancel, onReschedule }) => {
   const getStatusColor = (status) => {
     switch (status?.toLowerCase()) {
       case 'completed': return 'bg-success text-success-foreground';
@@ -103,6 +103,32 @@ const BookingCard = ({ booking, onViewDetails, onRebook, onRate, onContact }) =>
         >
           Details
         </Button>
+
+        {['pending','confirmed'].includes((booking?.status || '').toLowerCase()) && (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => onCancel(booking)}
+            iconName="X"
+            iconPosition="left"
+            iconSize={14}
+          >
+            Cancel
+          </Button>
+        )}
+
+        {['pending','confirmed'].includes((booking?.status || '').toLowerCase()) && (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => onReschedule(booking)}
+            iconName="Calendar"
+            iconPosition="left"
+            iconSize={14}
+          >
+            Reschedule
+          </Button>
+        )}
         
         {booking?.status === 'completed' && !booking?.rated && (
           <Button

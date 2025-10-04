@@ -1,84 +1,38 @@
 import React, { useState, useEffect } from 'react';
+import { useSelector, useDispatch } from 'react-redux';
 import Icon from '../AppIcon';
 import Button from './Button';
+import { removeToast } from '../../features/notifications/notificationsSlice';
+
 
 const NotificationCenter = ({ userRole = 'customer', isOpen = false, onToggle }) => {
+  const dispatch = useDispatch();
+  const toasts = useSelector((s) => s.notifications.toasts);
+
   const [notifications, setNotifications] = useState([]);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [readIds, setReadIds] = useState(new Set());
 
-  // Mock notifications based on user role
+  // Derive notifications from Redux toasts
   useEffect(() => {
-    const mockNotifications = {
-      customer: [
-        {
-          id: 1,
-          type: 'booking_confirmed',
-          title: 'Booking Confirmed',
-          message: 'Your plumbing service is scheduled for tomorrow at 2:00 PM',
-          timestamp: new Date(Date.now() - 1000 * 60 * 30), // 30 minutes ago
-          read: false,
-          icon: 'CheckCircle',
-          priority: 'normal'
-        },
-        {
-          id: 2,
-          type: 'technician_assigned',
-          title: 'Technician Assigned',
-          message: 'John Smith has been assigned to your electrical repair',
-          timestamp: new Date(Date.now() - 1000 * 60 * 60 * 2), // 2 hours ago
-          read: false,
-          icon: 'User',
-          priority: 'normal'
-        },
-        {
-          id: 3,
-          type: 'service_completed',
-          title: 'Service Completed',
-          message: 'Your HVAC maintenance has been completed. Please rate your experience.',
-          timestamp: new Date(Date.now() - 1000 * 60 * 60 * 24), // 1 day ago
-          read: true,
-          icon: 'Star',
-          priority: 'low'
-        }
-      ],
-      admin: [
-        {
-          id: 1,
-          type: 'new_booking',
-          title: 'New Booking Request',
-          message: '5 new service requests require technician assignment',
-          timestamp: new Date(Date.now() - 1000 * 60 * 15), // 15 minutes ago
-          read: false,
-          icon: 'Calendar',
-          priority: 'high'
-        },
-        {
-          id: 2,
-          type: 'technician_verification',
-          title: 'Technician Verification',
-          message: '3 technicians pending background check approval',
-          timestamp: new Date(Date.now() - 1000 * 60 * 60), // 1 hour ago
-          read: false,
-          icon: 'Shield',
-          priority: 'high'
-        },
-        {
-          id: 3,
-          type: 'system_alert',
-          title: 'System Performance',
-          message: 'Platform response time improved by 15% this week',
-          timestamp: new Date(Date.now() - 1000 * 60 * 60 * 4), // 4 hours ago
-          read: true,
-          icon: 'TrendingUp',
-          priority: 'low'
-        }
-      ]
-    };
+    const mapped = (toasts || []).map((t) => ({
+      id: t.id,
+      type: t.type,
+      title: t.title || (t.type === 'error' ? 'Error' : t.type === 'success' ? 'Success' : t.type === 'warning' ? 'Warning' : 'Notification'),
+      message: t.message,
+      timestamp: t.timestamp || Date.now(),
+      icon: t.type === 'error' ? 'AlertTriangle' : t.type === 'success' ? 'CheckCircle' : t.type === 'warning' ? 'AlertCircle' : 'Info',
+      priority: t.type === 'error' ? 'high' : t.type === 'warning' ? 'normal' : 'low',
+      read: readIds.has(t.id),
+    }));
 
-    const roleNotifications = mockNotifications?.[userRole] || [];
-    setNotifications(roleNotifications);
-    setUnreadCount(roleNotifications?.filter(n => !n?.read)?.length);
-  }, [userRole]);
+    // Ensure readIds only contains existing toasts
+    const existingIds = new Set(mapped.map((n) => n.id));
+    setReadIds((prev) => new Set([...prev].filter((id) => existingIds.has(id))));
+
+    setNotifications(mapped);
+    setUnreadCount(mapped.filter((n) => !n.read).length);
+  }, [toasts, readIds]);
 
   const formatTimestamp = (timestamp) => {
     const now = new Date();
@@ -102,27 +56,24 @@ const NotificationCenter = ({ userRole = 'customer', isOpen = false, onToggle })
   };
 
   const markAsRead = (notificationId) => {
-    setNotifications(prev => 
-      prev?.map(notification => 
-        notification?.id === notificationId 
-          ? { ...notification, read: true }
-          : notification
-      )
-    );
-    setUnreadCount(prev => Math.max(0, prev - 1));
+    setReadIds((prev) => {
+      const next = new Set(prev);
+      next.add(notificationId);
+      return next;
+    });
   };
 
   const markAllAsRead = () => {
-    setNotifications(prev => prev?.map(n => ({ ...n, read: true })));
-    setUnreadCount(0);
+    setReadIds(new Set(notifications.map((n) => n.id)));
   };
 
   const clearNotification = (notificationId) => {
-    setNotifications(prev => prev?.filter(n => n?.id !== notificationId));
-    const notification = notifications?.find(n => n?.id === notificationId);
-    if (notification && !notification?.read) {
-      setUnreadCount(prev => Math.max(0, prev - 1));
-    }
+    dispatch(removeToast(notificationId));
+    setReadIds((prev) => {
+      const next = new Set(prev);
+      next.delete(notificationId);
+      return next;
+    });
   };
 
   return (

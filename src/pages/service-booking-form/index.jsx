@@ -2,6 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import Header from '../../components/ui/Header';
 import Button from '../../components/ui/Button';
+import { useSelector } from 'react-redux';
+import { showError, showSuccess } from '../../features/notifications/notificationsSlice';
+import { useDispatch } from 'react-redux';
 
 import ServiceTypeSelector from './components/ServiceTypeSelector';
 import ServiceDetailsForm from './components/ServiceDetailsForm';
@@ -11,10 +14,13 @@ import TechnicianSelector from './components/TechnicianSelector';
 import PriceEstimation from './components/PriceEstimation';
 import FileUpload from './components/FileUpload';
 import ProgressIndicator from './components/ProgressIndicator';
+import { getServices } from '../../utils/api';
 
 const ServiceBookingForm = () => {
   const navigate = useNavigate();
   const location = useLocation();
+  const dispatch = useDispatch();
+  const user = useSelector((s) => s.auth.user);
   const [currentStep, setCurrentStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -31,69 +37,60 @@ const ServiceBookingForm = () => {
   const [autoMatch, setAutoMatch] = useState(false);
   const [uploadedFiles, setUploadedFiles] = useState([]);
 
-  // Mock data
-  const services = [
-    {
-      id: 'plumbing',
-      name: 'Plumbing',
-      description: 'Pipes, fixtures, water systems',
-      icon: 'Wrench',
-      basePrice: 75
-    },
-    {
-      id: 'electrical',
-      name: 'Electrical',
-      description: 'Wiring, outlets, lighting',
-      icon: 'Zap',
-      basePrice: 85
-    },
-    {
-      id: 'carpentry',
-      name: 'Carpentry',
-      description: 'Wood work, furniture, repairs',
-      icon: 'Hammer',
-      basePrice: 65
-    }
-  ];
+  // Services from backend (mapped to form needs)
+  const [services, setServices] = useState([]);
 
-  const technicians = [
-    {
-      id: 1,
-      name: 'Mike Johnson',
-      avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&h=150&fit=crop&crop=face',
-      rating: 4.8,
-      reviewCount: 127,
-      hourlyRate: 85,
-      experience: 8,
-      distance: 2.3,
-      isAvailable: true,
-      specialties: ['Emergency Repairs', 'Installations']
-    },
-    {
-      id: 2,
-      name: 'Sarah Davis',
-      avatar: 'https://images.unsplash.com/photo-1494790108755-2616b612b786?w=150&h=150&fit=crop&crop=face',
-      rating: 4.9,
-      reviewCount: 89,
-      hourlyRate: 90,
-      experience: 6,
-      distance: 1.8,
-      isAvailable: true,
-      specialties: ['Residential', 'Commercial']
-    },
-    {
-      id: 3,
-      name: 'David Wilson',
-      avatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150&h=150&fit=crop&crop=face',
-      rating: 4.7,
-      reviewCount: 156,
-      hourlyRate: 80,
-      experience: 12,
-      distance: 3.1,
-      isAvailable: false,
-      specialties: ['Troubleshooting', 'Maintenance']
-    }
-  ];
+  useEffect(() => {
+    (async () => {
+      try {
+        const data = await getServices();
+        const iconFor = (name) => {
+          const n = (name || '').toLowerCase();
+          if (n.includes('plumb')) return 'Wrench';
+          if (n.includes('elect')) return 'Zap';
+          if (n.includes('carp')) return 'Hammer';
+          return 'Tool';
+        };
+        const mapped = (data || []).map(s => ({
+          id: s.id,
+          name: s.name,
+          description: s.description,
+          icon: iconFor(s.name),
+          basePrice: Number(s.priceFrom || 0),
+        }));
+        setServices(mapped);
+      } catch (e) {
+        setServices([]);
+      }
+    })();
+  }, []);
+
+  // Technicians from backend (verified)
+  const [technicians, setTechnicians] = useState([]);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const { getTechnicians } = await import('../../utils/api');
+        const data = await getTechnicians({ status: 'verified' });
+        const mapped = (data || []).map(t => ({
+          id: t.id,
+          name: t.name,
+          avatar: '',
+          rating: t.rating,
+          reviewCount: 0,
+          hourlyRate: 0,
+          experience: 0,
+          distance: 0,
+          isAvailable: true,
+          specialties: [t.service]
+        }));
+        setTechnicians(mapped);
+      } catch (e) {
+        setTechnicians([]);
+      }
+    })();
+  }, []);
 
   const availableSlots = [
     '2025-01-07_09:00', '2025-01-07_10:00', '2025-01-07_14:00',
@@ -114,13 +111,13 @@ const ServiceBookingForm = () => {
   useEffect(() => {
     const params = new URLSearchParams(location.search);
     const serviceType = params?.get('service');
-    if (serviceType) {
-      const service = services?.find(s => s?.id === serviceType);
+    if (serviceType && services?.length) {
+      const service = services?.find(s => s?.id === serviceType || s?.name?.toLowerCase() === serviceType?.toLowerCase());
       if (service) {
         setSelectedService(service);
       }
     }
-  }, [location?.search]);
+  }, [location?.search, services]);
 
   const validateStep = (step) => {
     switch (step) {
@@ -157,24 +154,30 @@ const ServiceBookingForm = () => {
 
   const handleSubmit = async () => {
     if (!validateStep(currentStep)) return;
+    if (!user?.id) {
+      navigate('/user-login', { state: { message: 'Please log in to place a booking.' } });
+      return;
+    }
 
-    setIsSubmitting(true);
-    
-    // Mock API call
-    await new Promise(resolve => setTimeout(resolve, 2000));
-    
-    // Navigate to booking confirmation
-    navigate('/customer-booking-history', { 
-      state: { 
-        newBooking: {
-          service: selectedService,
-          date: selectedDate,
-          time: selectedTime,
-          technician: autoMatch ? 'Auto-matched' : selectedTechnician?.name,
-          address: address
-        }
-      }
-    });
+    try {
+      setIsSubmitting(true);
+      const iso = `${selectedDate}T${selectedTime}:00`;
+      const { createBooking } = await import('../../utils/api');
+      const created = await createBooking({
+        serviceId: selectedService?.id,
+        date: iso,
+        location: address,
+        customerId: user.id,
+        technicianId: autoMatch ? null : selectedTechnician?.id || null,
+      });
+      dispatch(showSuccess('Booking requested successfully'));
+      navigate(`/booking-success/${created.id}`);
+    } catch (e) {
+      const msg = e?.response?.data?.message || 'Failed to submit booking. Please try again.';
+      dispatch(showError(msg));
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const handleSaveDraft = () => {

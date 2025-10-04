@@ -125,23 +125,19 @@ const UserRegistration = () => {
     setIsLoading(true);
 
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      
-      // Mock successful registration
-      console.log('Registration successful:', { ...formData, role: selectedRole });
-      
-      // Navigate based on role
-      if (selectedRole === 'customer') {
-        navigate('/customer-dashboard');
-      } else {
-        // For technicians, they would typically go through verification first
-        navigate('/user-login', { 
-          state: { 
-            message: 'Registration successful! Please check your email for verification instructions.' 
-          }
-        });
-      }
+      // Call backend to register user
+      const name = formData.fullName || formData.email.split('@')[0];
+      const email = formData.email;
+      const password = formData.password;
+      const role = selectedRole;
+      const serviceName = role === 'technician' && formData?.serviceCategories?.length ? formData.serviceCategories[0] : undefined;
+      const { register } = await import('../../utils/api');
+      await register({ name, email, password, role, serviceName });
+
+      // Redirect to login with a success message
+      navigate('/user-login', {
+        state: { message: 'Registration successful! Please log in with your new credentials.' }
+      });
     } catch (error) {
       console.error('Registration failed:', error);
       setErrors({ submit: 'Registration failed. Please try again.' });

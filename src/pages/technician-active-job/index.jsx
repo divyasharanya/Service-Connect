@@ -2,10 +2,14 @@ import React from "react";
 import { useParams, Link } from "react-router-dom";
 import { useSelector, useDispatch } from "react-redux";
 import { updateBookingStatus } from "features/bookings/bookingsSlice";
+import { updateBookingStatus as apiUpdateBookingStatus } from "utils/api";
+import { useDispatch as useReduxDispatch } from "react-redux";
+import { showError, showSuccess } from "features/notifications/notificationsSlice";
 
 export default function TechnicianActiveJob() {
   const { id } = useParams();
   const dispatch = useDispatch();
+  const notify = useReduxDispatch();
   const booking = useSelector((s) => s.bookings.items.find((b) => b.id === id));
 
   if (!booking) {
@@ -17,7 +21,15 @@ export default function TechnicianActiveJob() {
     );
   }
 
-  const markCompleted = () => dispatch(updateBookingStatus({ id: booking.id, status: "completed" }));
+  const markCompleted = async () => {
+    try {
+      await apiUpdateBookingStatus(booking.id, 'completed');
+      notify(showSuccess('Job marked as completed'));
+      dispatch(updateBookingStatus({ id: booking.id, status: 'completed' }));
+    } catch (e) {
+      notify(showError('Failed to mark job completed'));
+    }
+  };
 
   return (
     <div className="mx-auto max-w-3xl p-4">

@@ -1,22 +1,38 @@
 import React, { useEffect } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import JobRequest from "components/JobRequest";
-import { getBookings } from "utils/api";
+import { getBookings, getTechnicianByUserId, updateBookingStatus as apiUpdateBookingStatus } from "utils/api";
 import { setBookings, setBookingsStatus, updateBookingStatus } from "features/bookings/bookingsSlice";
+import { useDispatch as useReduxDispatch } from "react-redux";
+import { showError, showSuccess } from "features/notifications/notificationsSlice";
 
 export default function TechnicianDashboard() {
   const dispatch = useDispatch();
+  const notify = useReduxDispatch();
   const { items: bookings, status } = useSelector((s) => s.bookings);
   const authUser = useSelector((s) => s.auth.user);
 
-  const technicianId = authUser?.role === "technician" ? authUser.id : "tech_1"; // fallback mock
+  const [techId, setTechId] = React.useState(null);
+
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        if (authUser?.role === 'technician' && authUser?.id) {
+          const t = await getTechnicianByUserId(authUser.id);
+          if (mounted) setTechId(t?.id || null);
+        }
+      } catch {}
+    })();
+    return () => { mounted = false; };
+  }, [authUser?.id, authUser?.role]);
 
   useEffect(() => {
     let mounted = true;
     (async () => {
       try {
         dispatch(setBookingsStatus("loading"));
-        const data = await getBookings();
+        const data = await getBookings(techId ? { technicianId: techId } : {});
         if (mounted) dispatch(setBookings(data));
       } catch (e) {
         dispatch(setBookingsStatus("error"));
@@ -27,12 +43,30 @@ export default function TechnicianDashboard() {
     return () => {
       mounted = false;
     };
-  }, [dispatch]);
+  }, [dispatch, techId]);
 
-  const myIncoming = bookings.filter((b) => b.technicianId === technicianId && b.status === "pending");
+  const myIncoming = bookings.filter((b) => (!techId || b.technicianId === techId) && b.status === "pending");
 
-  const onAccept = (id) => dispatch(updateBookingStatus({ id, status: "accepted" }));
-  const onReject = (id) => dispatch(updateBookingStatus({ id, status: "rejected" }));
+  const onAccept = async (id) => {
+    try {
+      await apiUpdateBookingStatus(id, 'accepted');
+      notify(showSuccess('Job accepted'));
+      const data = await getBookings(techId ? { technicianId: techId } : {});
+      dispatch(setBookings(data));
+    } catch (e) {
+      notify(showError('Failed to accept job'));
+    }
+  };
+  const onReject = async (id) => {
+    try {
+      await apiUpdateBookingStatus(id, 'rejected');
+      notify(showSuccess('Job rejected'));
+      const data = await getBookings(techId ? { technicianId: techId } : {});
+      dispatch(setBookings(data));
+    } catch (e) {
+      notify(showError('Failed to reject job'));
+    }
+  };
 
   return (
     <div className="mx-auto max-w-5xl p-4">

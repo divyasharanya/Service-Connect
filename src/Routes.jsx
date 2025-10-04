@@ -15,6 +15,8 @@ const CustomerDashboard = lazy(() => import('./pages/customer-dashboard'));
 const TechnicianDashboard = lazy(() => import('./pages/technician-dashboard'));
 const TechnicianActiveJob = lazy(() => import('./pages/technician-active-job'));
 const TechnicianWallet = lazy(() => import('./pages/technician-wallet'));
+const BookingSuccess = lazy(() => import('./pages/booking-success'));
+const RescheduleBooking = lazy(() => import('./pages/reschedule-booking'));
 
 const Routes = () => {
   return (
@@ -32,6 +34,8 @@ const Routes = () => {
             {/* Customer */}
             <Route path="/customer-dashboard" element={<CustomerDashboard />} />
             <Route path="/service-booking-form" element={<ServiceBookingForm />} />
+          <Route path="/booking-success/:id" element={<BookingSuccess />} />
+          <Route path="/reschedule/:id" element={<RescheduleBooking />} />
             <Route path="/customer-booking-history" element={<CustomerBookingHistory />} />
 
             {/* Technician (protected) */}

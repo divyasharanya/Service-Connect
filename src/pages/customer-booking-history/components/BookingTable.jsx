@@ -2,7 +2,7 @@ import React from 'react';
 import Icon from '../../../components/AppIcon';
 import Button from '../../../components/ui/Button';
 
-const BookingTable = ({ bookings, onViewDetails, onRebook, onRate, onContact }) => {
+const BookingTable = ({ bookings, onViewDetails, onRebook, onRate, onContact, onCancel, onReschedule }) => {
   const getStatusColor = (status) => {
     switch (status?.toLowerCase()) {
       case 'completed': return 'bg-success text-success-foreground';
@@ -100,49 +100,69 @@ const BookingTable = ({ bookings, onViewDetails, onRebook, onRate, onContact }) 
                 </td>
                 
                 <td className="py-4 px-4">
-                  <div className="flex items-center space-x-1">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => onViewDetails(booking)}
-                      iconName="Eye"
-                      iconSize={14}
-                      className="h-8 w-8 p-0"
-                    />
-                    
-                    {booking?.status === 'completed' && !booking?.rated && (
+                    <div className="flex items-center space-x-1">
                       <Button
                         variant="ghost"
                         size="sm"
-                        onClick={() => onRate(booking)}
-                        iconName="Star"
+                        onClick={() => onViewDetails(booking)}
+                        iconName="Eye"
                         iconSize={14}
                         className="h-8 w-8 p-0"
                       />
-                    )}
-                    
-                    {booking?.status === 'completed' && (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => onRebook(booking)}
-                        iconName="RotateCcw"
-                        iconSize={14}
-                        className="h-8 w-8 p-0"
-                      />
-                    )}
-                    
-                    {(booking?.status === 'confirmed' || booking?.status === 'in-progress') && (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => onContact(booking)}
-                        iconName="MessageCircle"
-                        iconSize={14}
-                        className="h-8 w-8 p-0"
-                      />
-                    )}
-                  </div>
+                      {['pending','confirmed'].includes((booking?.status || '').toLowerCase()) && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => onCancel(booking)}
+                          iconName="X"
+                          iconSize={14}
+                          className="h-8 w-8 p-0"
+                        />
+                      )}
+                      {['pending','confirmed'].includes((booking?.status || '').toLowerCase()) && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => onReschedule(booking)}
+                          iconName="Calendar"
+                          iconSize={14}
+                          className="h-8 w-8 p-0"
+                        />
+                      )}
+                      
+                      {booking?.status === 'completed' && !booking?.rated && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => onRate(booking)}
+                          iconName="Star"
+                          iconSize={14}
+                          className="h-8 w-8 p-0"
+                        />
+                      )}
+                      
+                      {booking?.status === 'completed' && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => onRebook(booking)}
+                          iconName="RotateCcw"
+                          iconSize={14}
+                          className="h-8 w-8 p-0"
+                        />
+                      )}
+                      
+                      {(booking?.status === 'confirmed' || booking?.status === 'in-progress') && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => onContact(booking)}
+                          iconName="MessageCircle"
+                          iconSize={14}
+                          className="h-8 w-8 p-0"
+                        />
+                      )}
+                    </div>
                 </td>
               </tr>
             ))}

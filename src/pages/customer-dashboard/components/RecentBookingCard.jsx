@@ -84,6 +84,11 @@ const RecentBookingCard = ({ booking }) => {
                 {booking?.technician?.rating}
               </span>
             </div>
+            {booking?.totalCost && (
+              <div className="ml-auto text-xs font-medium text-foreground">
+                ${booking.totalCost}
+              </div>
+            )}
           </div>
           
           <div className="flex items-center space-x-2">
