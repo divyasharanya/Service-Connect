@@ -1,0 +1,28 @@
+export const BOOKINGS = [
+  {
+    id: "bk_1",
+    serviceId: "svc_plumber",
+    serviceName: "Plumber",
+    customerName: "Divya",
+    technicianId: "tech_1",
+    technicianName: "Ravi Kumar",
+    date: new Date().toISOString(),
+    location: "Bengaluru",
+    status: "pending",
+    rating: null,
+    review: "",
+  },
+  {
+    id: "bk_2",
+    serviceId: "svc_electrician",
+    serviceName: "Electrician",
+    customerName: "Divya",
+    technicianId: "tech_2",
+    technicianName: "Anita Sharma",
+    date: new Date(Date.now() + 86400000).toISOString(),
+    location: "Hyderabad",
+    status: "accepted",
+    rating: null,
+    review: "",
+  },
+];

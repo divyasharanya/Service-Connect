@@ -1,0 +1,271 @@
+openapi: 3.0.3
+info:
+  title: ServiceConnect API
+  version: 0.1.0
+  description: REST API for Home Service Booking Platform. SQL-backed (PostgreSQL/MySQL). Endpoints align with frontend utils/api.js.
+servers:
+  - url: http://localhost:4000/api
+paths:
+  /auth/login:
+    post:
+      summary: Login with email/password
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email:
+                  type: string
+                  format: email
+                password:
+                  type: string
+      responses:
+        '200':
+          description: Auth success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        '401':
+          description: Invalid credentials
+  /services:
+    get:
+      summary: List available services
+      responses:
+        '200':
+          description: Service collection
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Service'
+  /technicians:
+    get:
+      summary: List technicians
+      parameters:
+        - in: query
+          name: status
+          schema:
+            type: string
+            enum: [pending, verified]
+          description: Filter technicians by status (verification)
+      responses:
+        '200':
+          description: Technician collection
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Technician'
+  /bookings:
+    get:
+      summary: List bookings
+      parameters:
+        - in: query
+          name: technicianId
+          schema:
+            type: string
+        - in: query
+          name: customerId
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Booking collection
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Booking'
+    post:
+      summary: Create a new booking
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BookingCreate'
+      responses:
+        '201':
+          description: Booking created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Booking'
+  /bookings/{id}:
+    patch:
+      summary: Update booking (e.g., status, rating)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BookingUpdate'
+      responses:
+        '200':
+          description: Updated booking
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Booking'
+  /technicians/{id}/approve:
+    post:
+      summary: Approve a technician account
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Technician approved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Technician'
+  /technicians/{id}/reject:
+    post:
+      summary: Reject a technician account
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Technician rejected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Technician'
+components:
+  schemas:
+    AuthResponse:
+      type: object
+      required: [token, user]
+      properties:
+        token:
+          type: string
+        user:
+          type: object
+          required: [id, name, role, email]
+          properties:
+            id:
+              type: string
+            name:
+              type: string
+            email:
+              type: string
+              format: email
+            role:
+              type: string
+              enum: [customer, technician, admin]
+    Service:
+      type: object
+      required: [id, name, priceFrom]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        description:
+          type: string
+        priceFrom:
+          type: number
+          format: float
+    Technician:
+      type: object
+      required: [id, name, service, verified]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        service:
+          type: string
+        rating:
+          type: number
+          format: float
+        verified:
+          type: boolean
+        earnings:
+          type: number
+          format: float
+    Booking:
+      type: object
+      required: [id, serviceId, serviceName, customerName, date, location, status]
+      properties:
+        id:
+          type: string
+        serviceId:
+          type: string
+        serviceName:
+          type: string
+        customerId:
+          type: string
+        customerName:
+          type: string
+        technicianId:
+          type: string
+          nullable: true
+        technicianName:
+          type: string
+          nullable: true
+        date:
+          type: string
+          format: date-time
+        location:
+          type: string
+        status:
+          type: string
+          enum: [pending, accepted, completed, rejected, cancelled]
+        rating:
+          type: integer
+          minimum: 1
+          maximum: 5
+          nullable: true
+        review:
+          type: string
+          nullable: true
+    BookingCreate:
+      type: object
+      required: [serviceId, date, location, customerId]
+      properties:
+        serviceId:
+          type: string
+        date:
+          type: string
+          format: date-time
+        location:
+          type: string
+        customerId:
+          type: string
+        technicianId:
+          type: string
+          nullable: true
+    BookingUpdate:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [pending, accepted, completed, rejected, cancelled]
+        rating:
+          type: integer
+          minimum: 1
+          maximum: 5
+        review:
+          type: string

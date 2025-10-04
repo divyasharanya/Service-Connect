@@ -1,0 +1,80 @@
+// See https://www.prisma.io/docs/reference/tools-and-interfaces/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+
+model User {
+  id           String    @id @default(cuid())
+  email        String    @unique
+  passwordHash String
+  name         String
+  role         String   @default("customer")
+  createdAt    DateTime  @default(now())
+  technician   Technician?
+  bookings     Booking[]  @relation("CustomerBookings")
+}
+
+model Service {
+  id          String     @id @default(cuid())
+  name        String
+  description String?
+  priceFrom   Decimal    @default(0)
+  technicians Technician[]
+  bookings    Booking[]
+}
+
+model Technician {
+  id         String    @id @default(cuid())
+  userId     String    @unique
+  user       User      @relation(fields: [userId], references: [id])
+  serviceId  String
+  service    Service   @relation(fields: [serviceId], references: [id])
+  rating     Decimal   @default(0)
+  verified   Boolean   @default(false)
+  earnings   Decimal   @default(0)
+  bookings   Booking[]
+  walletTxns WalletTransaction[]
+}
+
+model Booking {
+  id            String        @id @default(cuid())
+  serviceId     String
+  service       Service       @relation(fields: [serviceId], references: [id])
+  customerId    String
+  customer      User          @relation("CustomerBookings", fields: [customerId], references: [id])
+  technicianId  String?
+  technician    Technician?   @relation(fields: [technicianId], references: [id])
+  scheduledAt   DateTime
+  location      String
+  status        String        @default("pending")
+  rating        Int?
+  review        String?
+  createdAt     DateTime      @default(now())
+  // Optional one-to-one Review record
+  reviewRec     Review?
+}
+
+model Review {
+  id         String   @id @default(cuid())
+  bookingId  String   @unique
+  booking    Booking  @relation(fields: [bookingId], references: [id])
+  rating     Int
+  review     String?
+  createdAt  DateTime @default(now())
+}
+
+model WalletTransaction {
+  id            String          @id @default(cuid())
+  technicianId  String
+  technician    Technician      @relation(fields: [technicianId], references: [id])
+  amount        Decimal
+  type          String
+  createdAt     DateTime        @default(now())
+}
