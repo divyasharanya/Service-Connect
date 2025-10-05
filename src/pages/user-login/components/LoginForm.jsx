@@ -210,6 +210,15 @@ const LoginForm = ({ autoFillCredentials }) => {
         >
           Forgot password?
         </button>
+        <button
+          type="button"
+          onClick={() => navigate('/reset-password-direct')}
+          className="ml-4 text-sm text-muted-foreground hover:text-foreground transition-micro"
+          disabled={isLoading}
+          title="Development only"
+        >
+          Reset directly (dev)
+        </button>
       </div>
       {/* Submit Button */}
       <Button

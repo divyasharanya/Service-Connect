@@ -1,0 +1,9 @@
+
+> serviceconnect-backend@0.1.0 start
+> node src/server.js
+
+[serviceconnect-backend] Listening on http://localhost:4000
+[email] Using Ethereal test SMTP account: i3dufcwkle7vfvde@ethereal.email
+[email] Preview URL: https://ethereal.email/message/aOJgrIw8PbMuBKhraOJgsQ19kKym6UrQAAAAAVXlzOGzdIXLpkAeeX37ddg
+[dev] Password reset token for divyasaranya0619@gmail.com: 20dc1a44c621edff85925952f9e274a7085f0dd9b8211557fbed80006fe64269
+[dev] Reset link: http://localhost:5173/reset-password/20dc1a44c621edff85925952f9e274a7085f0dd9b8211557fbed80006fe64269

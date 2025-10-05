@@ -1,0 +1,6 @@
+
+> serviceconnect-backend@0.1.0 start
+> node src/server.js
+
+[serviceconnect-backend] Listening on http://localhost:4000
+[email] Using Ethereal test SMTP account: bllthq36jvdrybwo@ethereal.email

@@ -11,14 +11,16 @@ datasource db {
 
 
 model User {
-  id           String    @id @default(cuid())
-  email        String    @unique
-  passwordHash String
-  name         String
-  role         String   @default("customer")
-  createdAt    DateTime  @default(now())
-  technician   Technician?
-  bookings     Booking[]  @relation("CustomerBookings")
+  id                 String    @id @default(cuid())
+  email              String    @unique
+  passwordHash       String
+  name               String
+  role               String   @default("customer")
+  createdAt          DateTime  @default(now())
+  technician         Technician?
+  bookings           Booking[]  @relation("CustomerBookings")
+  resetTokenHash     String?
+  resetTokenExpiresAt DateTime?
 }
 
 model Service {

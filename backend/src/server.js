@@ -3,6 +3,10 @@ import express from 'express';
 import cors from 'cors';
 import { PrismaClient } from '@prisma/client';
 import bcrypt from 'bcryptjs';
+import http from 'http';
+import { Server as SocketIOServer } from 'socket.io';
+import crypto from 'crypto';
+import nodemailer from 'nodemailer';
 
 const app = express();
 const prisma = new PrismaClient();
@@ -20,10 +24,144 @@ app.use(cors({
 }));
 app.use(express.json());
 
+// HTTP server + Socket.io
+const server = http.createServer(app);
+const io = new SocketIOServer(server, {
+  cors: {
+    origin: [/^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/],
+    methods: ['GET', 'POST', 'PATCH'],
+  },
+});
+
+io.on('connection', (socket) => {
+  // Optionally auth later
+  socket.on('disconnect', () => {});
+});
+
+app.set('io', io);
+
+// Email transport
+const smtpHost = process.env.SMTP_HOST;
+const smtpPort = Number(process.env.SMTP_PORT || 587);
+const smtpUser = process.env.SMTP_USER;
+const smtpPass = process.env.SMTP_PASS;
+const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+
+let transporter = null;
+async function ensureTransporter() {
+  if (transporter) return transporter;
+  if (smtpHost && smtpUser && smtpPass) {
+    transporter = nodemailer.createTransport({
+      host: smtpHost,
+      port: smtpPort,
+      secure: smtpPort === 465,
+      auth: { user: smtpUser, pass: smtpPass },
+    });
+    return transporter;
+  }
+  // Dev fallback: create Ethereal test account so we can preview emails
+  const testAccount = await nodemailer.createTestAccount();
+  transporter = nodemailer.createTransport({
+    host: 'smtp.ethereal.email',
+    port: 587,
+    secure: false,
+    auth: { user: testAccount.user, pass: testAccount.pass },
+    tls: { rejectUnauthorized: false }
+  });
+  console.log(`[email] Using Ethereal test SMTP account: ${testAccount.user}`);
+  return transporter;
+}
+
 // Health
 app.get('/api/health', (_req, res) => res.json({ ok: true }));
 
 // Auth
+app.post('/api/auth/forgot-password', async (req, res) => {
+  const { email } = req.body || {};
+  if (!email) return res.status(400).json({ message: 'Email is required' });
+  try {
+    const user = await prisma.user.findUnique({ where: { email } });
+    // Always respond with success to prevent enumeration
+    if (!user) {
+      return res.json({ message: 'If an account exists, a reset link has been sent.' });
+    }
+    // Generate reset token
+    const token = crypto.randomBytes(32).toString('hex');
+    const hash = crypto.createHash('sha256').update(token).digest('hex');
+    const expires = new Date(Date.now() + 1000 * 60 * 60); // 1 hour
+    await prisma.user.update({ where: { id: user.id }, data: { resetTokenHash: hash, resetTokenExpiresAt: expires } });
+
+    // Ensure we have a mail transporter (uses Ethereal in dev if SMTP not set)
+    const tx = await ensureTransporter();
+
+    const resetLink = `${frontendUrl.replace(/\/$/, '')}/reset-password/${token}`;
+    const info = await tx.sendMail({
+      from: smtpUser || 'no-reply@serviceconnect.local',
+      to: email,
+      subject: 'Reset your ServiceConnect password',
+      text: `Click the link to reset your password: ${resetLink}`,
+      html: `<p>Click the link to reset your password:</p><p><a href=\"${resetLink}\">${resetLink}</a></p>`
+    });
+
+    // Dev helpers: log preview URL and token; return in response for local dev
+    let previewUrl = null;
+    try {
+      previewUrl = nodemailer.getTestMessageUrl(info);
+      if (previewUrl) console.log(`[email] Preview URL: ${previewUrl}`);
+      console.log(`[dev] Password reset token for ${email}: ${token}`);
+      console.log(`[dev] Reset link: ${resetLink}`);
+    } catch {}
+
+    const isProd = String(process.env.NODE_ENV || '').toLowerCase() === 'production';
+    const usingCustomSmtp = Boolean(smtpHost && smtpUser && smtpPass);
+    if (!isProd && !usingCustomSmtp) {
+      return res.json({ message: 'If an account exists, a reset link has been sent.', previewUrl, resetLink, token });
+    }
+
+    res.json({ message: 'If an account exists, a reset link has been sent.' });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+app.post('/api/auth/reset-password', async (req, res) => {
+  const { token, password } = req.body || {};
+  if (!token || !password) return res.status(400).json({ message: 'Token and password are required' });
+  try {
+    const hash = crypto.createHash('sha256').update(token).digest('hex');
+    const now = new Date();
+    const user = await prisma.user.findFirst({ where: { resetTokenHash: hash, resetTokenExpiresAt: { gt: now } } });
+    if (!user) return res.status(400).json({ message: 'Invalid or expired reset token' });
+
+    const passwordHash = await bcrypt.hash(password, 10);
+    await prisma.user.update({ where: { id: user.id }, data: { passwordHash, resetTokenHash: null, resetTokenExpiresAt: null } });
+
+    res.json({ message: 'Password has been reset successfully' });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// Dev-only: direct password reset without email (guarded by env flag)
+app.post('/api/auth/reset-password-direct', async (req, res) => {
+  try {
+    const enabled = String(process.env.ALLOW_DIRECT_PASSWORD_RESET || 'false').toLowerCase() === 'true';
+    if (!enabled) return res.status(403).json({ message: 'Direct password reset is disabled' });
+    const { email, password } = req.body || {};
+    if (!email || !password) return res.status(400).json({ message: 'email and password are required' });
+    const user = await prisma.user.findUnique({ where: { email } });
+    if (!user) return res.status(404).json({ message: 'User not found' });
+    const passwordHash = await bcrypt.hash(password, 10);
+    await prisma.user.update({ where: { id: user.id }, data: { passwordHash, resetTokenHash: null, resetTokenExpiresAt: null } });
+    return res.json({ message: 'Password has been reset successfully' });
+  } catch (e) {
+    console.error(e);
+    return res.status(500).json({ message: 'Server error' });
+  }
+});
+
 app.post('/api/auth/login', async (req, res) => {
   const { email, password } = req.body || {};
   if (!email || !password) return res.status(400).json({ message: 'Email and password required' });
@@ -270,7 +408,7 @@ app.post('/api/bookings', async (req, res) => {
     const serviceFee = Number((base - platformFee).toFixed(2));
     const totalCost = Number(base.toFixed(2));
 
-    res.status(201).json({
+    const payload = {
       id: created.id,
       serviceId: created.serviceId,
       serviceName: created.service.name,
@@ -286,7 +424,12 @@ app.post('/api/bookings', async (req, res) => {
       totalCost,
       serviceFee,
       platformFee,
-    });
+    };
+
+    // Emit socket event for real-time updates
+    try { io.emit('booking:update', payload); } catch {}
+
+    res.status(201).json(payload);
   } catch (e) {
     console.error(e);
     res.status(500).json({ message: 'Server error' });
@@ -309,14 +452,40 @@ app.patch('/api/bookings/:id', async (req, res) => {
       data.scheduledAt = d;
     }
 
-    const updated = await prisma.booking.update({ where: { id }, data });
-    res.json(updated);
+    const updated = await prisma.booking.update({ where: { id }, data, include: { service: true, customer: true, technician: { include: { user: true } } } });
+
+    const base = Number(updated.service?.priceFrom ?? 0) || 0;
+    const platformFee = Number((base * 0.1).toFixed(2));
+    const serviceFee = Number((base - platformFee).toFixed(2));
+    const totalCost = Number(base.toFixed(2));
+
+    const payload = {
+      id: updated.id,
+      serviceId: updated.serviceId,
+      serviceName: updated.service?.name,
+      customerId: updated.customerId,
+      customerName: updated.customer?.name,
+      technicianId: updated.technicianId ?? null,
+      technicianName: updated.technician?.user?.name ?? null,
+      date: (updated.scheduledAt ?? new Date()).toISOString(),
+      location: updated.location,
+      status: updated.status,
+      rating: updated.rating ?? null,
+      review: updated.review ?? null,
+      totalCost,
+      serviceFee,
+      platformFee,
+    };
+
+    try { io.emit('booking:update', payload); } catch {}
+
+    res.json(payload);
   } catch (e) {
     console.error(e);
     res.status(500).json({ message: 'Server error' });
   }
 });
 
-app.listen(PORT, () => {
+server.listen(PORT, () => {
   console.log(`[serviceconnect-backend] Listening on http://localhost:${PORT}`);
 });

@@ -75,6 +75,33 @@ export async function login({ email, password, role = "customer" }) {
   };
 }
 
+export async function forgotPassword(email) {
+  if (!USE_MOCK && API_BASE_URL) {
+    const { data } = await http.post('/auth/forgot-password', { email });
+    return data;
+  }
+  await delay();
+  return { message: 'If an account exists, a reset link has been sent.' };
+}
+
+export async function resetPassword({ token, password }) {
+  if (!USE_MOCK && API_BASE_URL) {
+    const { data } = await http.post('/auth/reset-password', { token, password });
+    return data;
+  }
+  await delay();
+  return { message: 'Password has been reset successfully' };
+}
+
+export async function resetPasswordDirect({ email, password }) {
+  if (!USE_MOCK && API_BASE_URL) {
+    const { data } = await http.post('/auth/reset-password-direct', { email, password });
+    return data;
+  }
+  await delay();
+  return { message: 'Password has been reset successfully' };
+}
+
 export async function register({ name, email, password, role = 'customer' }) {
   if (!USE_MOCK && API_BASE_URL) {
     const { data } = await http.post('/auth/register', { name, email, password, role });

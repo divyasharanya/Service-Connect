@@ -1,0 +1,21 @@
+
+> serviceconnect-backend@0.1.0 start
+> node src/server.js
+
+[serviceconnect-backend] Listening on http://localhost:4000
+[email] Using Ethereal test SMTP account: jhwjcqdd7fe2bq53@ethereal.email
+[email] Preview URL: https://ethereal.email/message/aOJchYw8PbMuBDxxaOJciYQ.v3CUu1yOAAAAAZhr1zasaRRTuAjd69CL.ok
+[dev] Password reset token for customer@serviceconnect.com: aef05d2f0bcba7a9a3690a7ef6edc4b6817173ea475ceb37afd28dc239843e1c
+[dev] Reset link: http://localhost:5173/reset-password/aef05d2f0bcba7a9a3690a7ef6edc4b6817173ea475ceb37afd28dc239843e1c
+[email] Preview URL: https://ethereal.email/message/aOJchYw8PbMuBDxxaOJc4vCm3db-GsSiAAAAAj-8ferXaez5jGgv1CaaPZU
+[dev] Password reset token for tarunyasai2007@gmail.com: d43f463bcf5a44fc997d1ee6940db5805d3067c9b824a8d4d968ea0810aebbdf
+[dev] Reset link: http://localhost:5173/reset-password/d43f463bcf5a44fc997d1ee6940db5805d3067c9b824a8d4d968ea0810aebbdf
+[email] Preview URL: https://ethereal.email/message/aOJchYw8PbMuBDxxaOJdCFPQQmY63pNlAAAAAycw3ncftIncy68kVQMdoi0
+[dev] Password reset token for divyasaranya0619@gmail.com: b64a9f1ec50a79f007ed6577ac30da73a5469890e8cf82f39677fb8eeaadbb4c
+[dev] Reset link: http://localhost:5173/reset-password/b64a9f1ec50a79f007ed6577ac30da73a5469890e8cf82f39677fb8eeaadbb4c
+[email] Preview URL: https://ethereal.email/message/aOJchYw8PbMuBDxxaOJdo4Q.v3CUu1ysAAAABH7VomHVx9kbjjufTB5OtKY
+[dev] Password reset token for divyasaranya0619@gmail.com: 09d5dab90dc1f7243e31773457bfb615a13ab98421cf6ee0cf3fdf9b36e12d12
+[dev] Reset link: http://localhost:5173/reset-password/09d5dab90dc1f7243e31773457bfb615a13ab98421cf6ee0cf3fdf9b36e12d12
+[email] Preview URL: https://ethereal.email/message/aOJchYw8PbMuBDxxaOJekvCm3db-GsTJAAAABb57FNSE5w2nCTMETRDsOzo
+[dev] Password reset token for divyasaranya0619@gmail.com: 8adc55a9ad61c7801e91b9cda59c70f6a562f4e5a087599dc3e01eb3ba2ff337
+[dev] Reset link: http://localhost:5173/reset-password/8adc55a9ad61c7801e91b9cda59c70f6a562f4e5a087599dc3e01eb3ba2ff337

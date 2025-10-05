@@ -22,6 +22,9 @@ export default function TechnicianActiveJob() {
   }
 
   const markCompleted = async () => {
+    if ((booking.status || '').toLowerCase() === 'completed') return;
+    const ok = window.confirm('Mark this job as completed?');
+    if (!ok) return;
     try {
       await apiUpdateBookingStatus(booking.id, 'completed');
       notify(showSuccess('Job marked as completed'));
@@ -56,9 +59,10 @@ export default function TechnicianActiveJob() {
         <div className="mt-4">
           <button
             onClick={markCompleted}
-            className="rounded-md bg-emerald-600 px-4 py-2 text-white hover:bg-emerald-700"
+            disabled={(booking.status || '').toLowerCase() === 'completed'}
+            className={`rounded-md px-4 py-2 text-white ${((booking.status || '').toLowerCase() === 'completed') ? 'bg-slate-400 cursor-not-allowed' : 'bg-emerald-600 hover:bg-emerald-700'}`}
           >
-            Mark Completed
+            {((booking.status || '').toLowerCase() === 'completed') ? 'Completed' : 'Mark Completed'}
           </button>
         </div>
       </div>

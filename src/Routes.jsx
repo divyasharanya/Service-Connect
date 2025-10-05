@@ -17,6 +17,10 @@ const TechnicianActiveJob = lazy(() => import('./pages/technician-active-job'));
 const TechnicianWallet = lazy(() => import('./pages/technician-wallet'));
 const BookingSuccess = lazy(() => import('./pages/booking-success'));
 const RescheduleBooking = lazy(() => import('./pages/reschedule-booking'));
+const BookingDetails = lazy(() => import('./pages/booking-details'));
+const ForgotPassword = lazy(() => import('./pages/forgot-password'));
+const ResetPassword = lazy(() => import('./pages/reset-password'));
+const ResetPasswordDirect = lazy(() => import('./pages/reset-password-direct'));
 
 const Routes = () => {
   return (
@@ -30,12 +34,16 @@ const Routes = () => {
             <Route path="/" element={<CustomerDashboard />} />
             <Route path="/user-login" element={<UserLogin />} />
             <Route path="/user-registration" element={<UserRegistration />} />
+            <Route path="/forgot-password" element={<ForgotPassword />} />
+            <Route path="/reset-password/:token" element={<ResetPassword />} />
+            <Route path="/reset-password-direct" element={<ResetPasswordDirect />} />
 
             {/* Customer */}
             <Route path="/customer-dashboard" element={<CustomerDashboard />} />
             <Route path="/service-booking-form" element={<ServiceBookingForm />} />
           <Route path="/booking-success/:id" element={<BookingSuccess />} />
           <Route path="/reschedule/:id" element={<RescheduleBooking />} />
+          <Route path="/booking-details/:id" element={<BookingDetails />} />
             <Route path="/customer-booking-history" element={<CustomerBookingHistory />} />
 
             {/* Technician (protected) */}

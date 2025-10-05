@@ -1,21 +1,147 @@
 import React, { useState, useEffect } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
+import { useNavigate } from 'react-router-dom';
 import Icon from '../AppIcon';
 import Button from './Button';
 import { removeToast } from '../../features/notifications/notificationsSlice';
+import { getBookings, getTechnicianByUserId } from '../../utils/api';
+import { io } from 'socket.io-client';
 
 
 const NotificationCenter = ({ userRole = 'customer', isOpen = false, onToggle }) => {
   const dispatch = useDispatch();
+  const navigate = useNavigate();
   const toasts = useSelector((s) => s.notifications.toasts);
+  const user = useSelector((s) => s.auth.user);
 
   const [notifications, setNotifications] = useState([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [readIds, setReadIds] = useState(new Set());
+  const [serverFeed, setServerFeed] = useState([]); // notifications derived from backend bookings
+  const [techId, setTechId] = useState(null);
 
-  // Derive notifications from Redux toasts
+  // Load persisted readIds
   useEffect(() => {
-    const mapped = (toasts || []).map((t) => ({
+    try {
+      const raw = localStorage.getItem('notificationReadIds_v1');
+      if (raw) setReadIds(new Set(JSON.parse(raw)));
+    } catch {}
+  }, []);
+
+  // Persist readIds
+  useEffect(() => {
+    try {
+      localStorage.setItem('notificationReadIds_v1', JSON.stringify(Array.from(readIds)));
+    } catch {}
+  }, [readIds]);
+
+  // Resolve technician id when needed
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      if (user?.role === 'technician' && user?.id) {
+        try {
+          const t = await getTechnicianByUserId(user.id);
+          if (mounted) setTechId(t?.id || null);
+        } catch {
+          if (mounted) setTechId(null);
+        }
+      } else {
+        setTechId(null);
+      }
+    })();
+    return () => { mounted = false; };
+  }, [user?.id, user?.role]);
+
+  // Poll backend bookings and derive notifications (disabled: using sockets only)
+  // useEffect(() => {
+  //   let timer;
+  //   let aborted = false;
+  //   async function tick() {
+  //     try {
+  //       if (!user?.id) { setServerFeed([]); return; }
+  //       let params = {};
+  //       if (user.role === 'customer') params = { customerId: user.id };
+  //       if (user.role === 'technician' && techId) params = { technicianId: techId };
+  //       if (Object.keys(params).length === 0) { setServerFeed([]); return; }
+  //       const data = await getBookings(params);
+  //       const now = Date.now();
+  //       const items = (data || []).map((b) => mapBookingToNotification(b, now));
+  //       if (!aborted) setServerFeed(items);
+  //     } catch {
+  //       if (!aborted) setServerFeed([]);
+  //     }
+  //     timer = setTimeout(tick, 15000);
+  //   }
+  //   tick();
+  //   return () => { aborted = true; if (timer) clearTimeout(timer); };
+  // }, [user?.id, user?.role, techId, readIds]);
+
+  // WebSocket: connect to backend and receive real-time booking updates
+  useEffect(() => {
+    if (!user?.id) return;
+    const socket = io(import.meta.env.VITE_API_BASE_URL?.replace(/\/api$/, '') || 'http://localhost:4000', {
+      transports: ['websocket'],
+      reconnection: true,
+    });
+    const handler = (b) => {
+      // Only take relevant updates
+      if (user.role === 'customer' && b.customerId !== user.id) return;
+      if (user.role === 'technician') {
+        if (!techId || b.technicianId !== techId) return;
+      }
+      const now = Date.now();
+      setServerFeed((prev) => {
+        const next = [...prev];
+        const item = mapBookingToNotification(b, now);
+        // Replace matching id if present
+        const idx = next.findIndex((n) => n.id === item.id);
+        if (idx >= 0) next[idx] = item; else next.unshift(item);
+        return next;
+      });
+    };
+    socket.on('booking:update', handler);
+    return () => {
+      try { socket.off('booking:update', handler); socket.close(); } catch {}
+    };
+  }, [user?.id, user?.role, techId, readIds]);
+
+  // Helper: map booking to a notification object with click target
+  const mapBookingToNotification = (b, nowTs) => {
+    const now = nowTs || Date.now();
+    const status = (b.status || '').toLowerCase();
+    let title = 'Booking Update';
+    let message = `${b.serviceName} · ${new Date(b.date).toLocaleString()}`;
+    let icon = 'Info';
+    let priority = 'low';
+    let targetPath = '';
+    if (user?.role === 'customer') {
+      if (status === 'accepted') { title = 'Technician Accepted'; icon = 'CheckCircle'; priority = 'normal'; }
+      if (status === 'completed') { title = 'Service Completed'; icon = 'Star'; priority = 'low'; }
+      if (status === 'cancelled' || status === 'rejected') { title = 'Booking Cancelled'; icon = 'XCircle'; priority = 'normal'; }
+      targetPath = `/booking-details/${b.id}`;
+    } else if (user?.role === 'technician') {
+      if (status === 'pending') { title = 'New Job Pending'; icon = 'Bell'; priority = 'high'; }
+      if (status === 'in-progress') { title = 'Job In Progress'; icon = 'Timer'; priority = 'normal'; }
+      if (status === 'completed') { title = 'Job Completed'; icon = 'CheckCircle'; priority = 'low'; }
+      targetPath = `/technician-active-job/${b.id}`;
+    }
+    return {
+      id: `booking_${b.id}_${status}`,
+      type: 'booking',
+      title,
+      message,
+      timestamp: new Date(b.date).getTime() || now,
+      icon,
+      priority,
+      read: readIds.has(`booking_${b.id}_${status}`),
+      targetPath,
+    };
+  };
+
+  // Merge Redux toasts with serverFeed
+  useEffect(() => {
+    const toastMapped = (toasts || []).map((t) => ({
       id: t.id,
       type: t.type,
       title: t.title || (t.type === 'error' ? 'Error' : t.type === 'success' ? 'Success' : t.type === 'warning' ? 'Warning' : 'Notification'),
@@ -26,13 +152,17 @@ const NotificationCenter = ({ userRole = 'customer', isOpen = false, onToggle })
       read: readIds.has(t.id),
     }));
 
-    // Ensure readIds only contains existing toasts
-    const existingIds = new Set(mapped.map((n) => n.id));
-    setReadIds((prev) => new Set([...prev].filter((id) => existingIds.has(id))));
+    // Combine by id (serverFeed may share ids across statuses), prefer most recent timestamp
+    const byId = new Map();
+    [...serverFeed, ...toastMapped].forEach((n) => {
+      const existing = byId.get(n.id);
+      if (!existing || (n.timestamp || 0) > (existing.timestamp || 0)) byId.set(n.id, n);
+    });
 
-    setNotifications(mapped);
-    setUnreadCount(mapped.filter((n) => !n.read).length);
-  }, [toasts, readIds]);
+    const merged = Array.from(byId.values()).sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+    setNotifications(merged);
+    setUnreadCount(merged.filter((n) => !n.read).length);
+  }, [toasts, serverFeed, readIds]);
 
   const formatTimestamp = (timestamp) => {
     const now = new Date();
@@ -68,6 +198,7 @@ const NotificationCenter = ({ userRole = 'customer', isOpen = false, onToggle })
   };
 
   const clearNotification = (notificationId) => {
+    // Remove from Redux toasts (no-op if id belongs to serverFeed)
     dispatch(removeToast(notificationId));
     setReadIds((prev) => {
       const next = new Set(prev);
@@ -125,7 +256,10 @@ const NotificationCenter = ({ userRole = 'customer', isOpen = false, onToggle })
                   className={`p-4 border-b border-border last:border-b-0 hover:bg-muted transition-micro cursor-pointer ${
                     !notification?.read ? 'bg-muted/50' : ''
                   }`}
-                  onClick={() => markAsRead(notification?.id)}
+                  onClick={() => {
+                    markAsRead(notification?.id);
+                    if (notification?.targetPath) navigate(notification.targetPath);
+                  }}
                 >
                   <div className="flex items-start space-x-3">
                     <div className={`flex-shrink-0 ${getPriorityColor(notification?.priority)}`}>
